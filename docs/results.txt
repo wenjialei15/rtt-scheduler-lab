@@ -1,0 +1,18 @@
+
+ \ | /
+- RT -     Thread Operating System
+ / | \     4.1.1 build Nov 25 2026 23:33:22
+ 2006 - 2022 Copyright by RT-Thread team
+
+=== RT-Thread scheduling / IPC lab ===
+kernel 4.1.1, tick 100 Hz, 32 priorities
+
+E1 preemption   log=LMHhml  (expect L M H h m l)
+E2 time slice   A=569179777 B=692227300  A/B=0.82
+E4 mailbox      500 round trips, 22714 us total, 45 us each
+E5 switch       5000 yields in 24478 us, 4.89 us per switch
+
+RESULT preemption=LMHhml
+RESULT slice_a=569179777 slice_b=692227300
+
+done

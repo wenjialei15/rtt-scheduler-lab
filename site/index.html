@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RT-Thread 调度实验 · Windows 上量四个数</title>
+<style>
+  :root{
+    --ink:#16181c; --muted:#5c626d; --line:#e3e1db; --bg:#fcfbf9;
+    --card:#fff; --hi:#0f6e56; --mid:#185fa5; --low:#8a6d3b; --mono:ui-monospace,SFMono-Regular,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    line-height:1.7;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:920px;margin:0 auto;padding:0 28px}
+  header{padding:64px 0 36px}
+  .kicker{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:16px}
+  h1{font-size:38px;line-height:1.25;font-weight:600;letter-spacing:-.02em;margin:0 0 18px}
+  .lede{font-size:16.5px;color:var(--muted);max-width:620px;margin:0}
+  .stats{display:flex;gap:46px;flex-wrap:wrap;margin:38px 0 0;padding-top:26px;border-top:1px solid var(--line)}
+  .stat b{display:block;font-size:30px;font-weight:600;letter-spacing:-.02em;line-height:1.15;font-family:var(--mono)}
+  .stat span{font-size:12.5px;color:var(--muted)}
+  section{padding:46px 0;border-top:1px solid var(--line)}
+  h2{font-size:19px;font-weight:600;margin:0 0 6px}
+  .sub{color:var(--muted);font-size:13.5px;margin:0 0 24px}
+  p{font-size:15px;margin:0 0 14px}
+  code{font-family:var(--mono);font-size:13px;background:#f3f1ec;padding:1px 5px;border-radius:3px}
+  .timeline{border:1px solid var(--line);background:var(--card);padding:22px}
+  .track{display:flex;height:44px;border-radius:4px;overflow:hidden}
+  .seg{display:flex;align-items:center;justify-content:center;color:#fff;font-family:var(--mono);font-size:13px;font-weight:600}
+  .seg.l{background:var(--low)} .seg.m{background:var(--mid)} .seg.h{background:var(--hi)}
+  .axis{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:8px;font-family:var(--mono)}
+  .note{font-size:12.5px;color:var(--muted);margin-top:14px}
+  table{width:100%;border-collapse:collapse;font-size:14px;background:var(--card);border:1px solid var(--line)}
+  th,td{padding:11px 14px;border-bottom:1px solid var(--line);text-align:left}
+  th{font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:500}
+  tr:last-child td{border-bottom:0}
+  td.n{font-family:var(--mono);font-variant-numeric:tabular-nums}
+  .ok{color:var(--hi);font-weight:600}
+  .warn{color:#a86a00}
+  .split{display:grid;grid-template-columns:1fr 1fr;gap:34px}
+  .pit{border-top:2px solid var(--line);padding-top:12px}
+  .pit h3{font-size:14px;margin:0 0 6px;font-weight:600}
+  .pit p{font-size:14px;margin:0;color:var(--muted)}
+  ul{margin:0;padding-left:20px}
+  li{font-size:14.5px;margin-bottom:8px}
+  pre{background:#f6f4ef;border:1px solid var(--line);padding:14px 16px;overflow-x:auto;font-size:12.5px;line-height:1.7;margin:24px 0 0}
+  footer{border-top:1px solid var(--line);padding:28px 0 48px;font-size:13px;color:var(--muted)}
+  footer a{color:var(--muted)}
+  @media (max-width:700px){
+    h1{font-size:28px}
+    .stats{gap:24px}
+    .split{grid-template-columns:1fr;gap:20px}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <div class="kicker">RT-Thread 4.1.1 · win32 simulator · 4 experiments</div>
+    <h1>把 RT-Thread 跑在 Windows 上，<br>量四个数。</h1>
+    <p class="lede">
+      不买开发板，不装 Linux。用 zig 把官方内核编成一个 32 位 Windows 程序，
+      用它自己的调度器跑抢占、时间片、邮箱和上下文切换。
+    </p>
+    <div class="stats">
+      <div class="stat"><b>4</b><span>组实验</span></div>
+      <div class="stat"><b>5 µs</b><span>一次让出</span></div>
+      <div class="stat"><b>50 µs</b><span>邮箱往返</span></div>
+      <div class="stat"><b>100 Hz</b><span>系统 tick</span></div>
+    </div>
+  </div>
+</header>
+
+<section>
+  <div class="wrap">
+    <h2>E1 · 抢占是真的</h2>
+    <p class="sub">低、中、高三个线程各忙 3 个 tick，故意按低 → 中 → 高的顺序放行。</p>
+    <div class="timeline">
+      <div class="track">
+        <div class="seg l" style="flex:3">L</div>
+        <div class="seg m" style="flex:3">M</div>
+        <div class="seg h" style="flex:3">H</div>
+        <div class="seg h" style="flex:3">h</div>
+        <div class="seg m" style="flex:3">m</div>
+        <div class="seg l" style="flex:3">l</div>
+      </div>
+      <div class="axis"><span>t = 0</span><span>18 ticks</span></div>
+      <div class="note">
+        实测日志 <code>LMHhml</code>，三次运行完全一致。大写是开始，小写是结束：
+        低优先级先跑，被中抢占，再被高抢占；高结束后中恢复，最后低收尾。
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>四个数</h2>
+    <p class="sub">同一台机器跑三次，取范围。绝对值只在这个模拟环境里成立。</p>
+    <table>
+      <thead>
+        <tr><th>实验</th><th>测什么</th><th>结果</th><th>稳定性</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>E1 抢占</td><td>高优先级能否打断低优先级</td><td class="n">LMHhml</td><td class="ok">3/3 一致</td></tr>
+        <tr><td>E2 时间片</td><td>同优先级两个线程的循环次数比</td><td class="n">1.12 / 1.18 / 1.21</td><td class="warn">波动 ±20%</td></tr>
+        <tr><td>E4 邮箱</td><td>两个线程 ping-pong 500 次</td><td class="n">45 / 49 / 55 µs</td><td class="ok">±10%</td></tr>
+        <tr><td>E5 切换</td><td>连续 <code>rt_thread_yield()</code> 5000 次</td><td class="n">4.89 / 4.95 / 5.32 µs</td><td class="ok">±5%</td></tr>
+      </tbody>
+    </table>
+    <div class="note">
+      5 µs 不是 Cortex-M 的真实切换时间——这里每次切换都要经过一次 Windows 的
+      <code>SuspendThread</code> / <code>ResumeThread</code>。这个数只能用来做同环境下的相对比较。
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>两个必须踩的坑</h2>
+    <div class="split">
+      <div class="pit">
+        <h3>必须编 32 位</h3>
+        <p>RT-Thread 的 <code>rt_base_t</code> 定义成 <code>long</code>。Windows 64 位是 LLP64，<code>long</code> 只有 32 位，直接编 64 位会把指针截断——堆初始化就崩。</p>
+      </div>
+      <div class="pit">
+        <h3>主线程栈至少 8 KB</h3>
+        <p>4 KB 时，第一个线程里调 <code>rt_kprintf</code> 就崩。裸机上够用的栈，到了桌面 CRT 的 <code>vsnprintf</code> 面前不够。</p>
+      </div>
+    </div>
+<pre>zig cc -target x86-windows-gnu \
+  -Iport -Ithird_party/rt-thread/include \
+  third_party/rt-thread/src/*.c \
+  third_party/rt-thread/libcpu/sim/win32/cpu_port.c \
+  port/board.c src/main.c -lwinmm -o build/rtt.exe</pre>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>没能测出来的那一项</h2>
+    <p>原本还有 E3：优先级继承——低优先级线程持锁时，中优先级线程能不能抢在它前面跑。</p>
+    <p>实测日志停在 <code>L+ H? H+</code>，<code>L-</code>、<code>M+</code>、<code>M-</code> 全部丢失。怀疑是移植层在改线程优先级时先 <code>SuspendThread</code>，恢复路径没有走回来。代码留在仓库里，注释掉了。</p>
+    <p class="sub" style="margin:0">与其编一个「测出来了」的结论，不如把没测出来的原因写清楚。</p>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>边界</h2>
+    <ul>
+      <li>模拟器不是真机：线程映射成 Windows 线程，切换走 <code>SuspendThread</code>，绝对数字不可外推。</li>
+      <li>E2 的 ±20% 波动来自宿主调度，不是 RT-Thread 的时间片算法。</li>
+      <li>只编了 32 位；64 位要先把 <code>rt_base_t</code> 换成 64 位类型。</li>
+      <li>没有跑文件系统、网络和 finsh，只保留内核与 IPC。</li>
+    </ul>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    Apache-2.0 · RT-Thread 版权归其团队所有 ·
+    <a href="https://github.com/wenjialei15/rtt-scheduler-lab">github.com/wenjialei15/rtt-scheduler-lab</a>
+  </div>
+</footer>
+
+</body>
+</html>
