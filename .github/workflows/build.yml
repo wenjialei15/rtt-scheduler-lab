@@ -28,7 +28,7 @@ jobs:
         run: pip install ziglang
 
       - name: Cross-build for Windows
-        run: CC="python -m ziglang" ./build.sh
+        run: CC="python -m ziglang cc" ./build.sh
 
       - uses: actions/configure-pages@v5
         with:
